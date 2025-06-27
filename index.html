@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Slide Viewer</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: black;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    canvas {
+      display: block;
+      background-color: black;
+    }
+    #slide-number {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      font-size: 24px;
+      color: white;
+      background: rgba(0,0,0,0.6);
+      padding: 6px 12px;
+      border-radius: 8px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="pdf-canvas"></canvas>
+  <div id="slide-number">1</div>
+
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <script>
+    const canvas = document.getElementById('pdf-canvas');
+    const ctx = canvas.getContext('2d');
+    const slideNumber = document.getElementById('slide-number');
+    const pdfUrl = 'images/Synamedia Iris Sales Presentation - PayTV - 2023.pdf';
+
+    let pdfDoc = null;
+    let currentPage = 1;
+    let firstKeyPressed = false;
+
+    function clearCanvasWithBlack() {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+
+    function renderPage(pageNum) {
+      pdfDoc.getPage(pageNum).then(page => {
+        const unscaledViewport = page.getViewport({ scale: 1 });
+
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        const scaleX = screenWidth / unscaledViewport.width;
+        const scaleY = screenHeight / unscaledViewport.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        const viewport = page.getViewport({ scale });
+
+        // Resize canvas and immediately fill with black
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        clearCanvasWithBlack();
+
+        // Render slide
+        const renderContext = {
+          canvasContext: ctx,
+          viewport
+        };
+        page.render(renderContext);
+
+        slideNumber.textContent = `${pageNum} / ${pdfDoc.numPages}`;
+      });
+    }
+
+    function changePage(offset) {
+      const next = currentPage + offset;
+      if (next >= 1 && next <= pdfDoc.numPages) {
+        currentPage = next;
+        renderPage(currentPage);
+      }
+    }
+
+    function requestFullscreen() {
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else if (el.msRequestFullscreen) el.msRequestFullscreen();
+    }
+
+    pdfjsLib.getDocument(pdfUrl).promise.then(doc => {
+      pdfDoc = doc;
+      renderPage(currentPage);
+    }).catch(error => {
+      alert("Failed to load PDF: " + error.message);
+      console.error(error);
+    });
+
+    window.addEventListener('resize', () => {
+      if (pdfDoc) {
+        clearCanvasWithBlack(); // pre-fill while resizing
+        renderPage(currentPage);
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!firstKeyPressed) {
+        requestFullscreen();
+        firstKeyPressed = true;
+      }
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          changePage(-1);
+          break;
+        case 'ArrowRight':
+          changePage(1);
+          break;
+      }
+    });
+  </script>
+</body>
+</html>
